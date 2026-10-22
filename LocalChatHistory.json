@@ -1,7 +1,18 @@
 [
     {
-        "message": "Welcome to lan chatroom",
-        "username": "system"
+        "username": "system",
+        "message": "Welcome to LAN Chatroom"
+    },
+    {
+        "username": "default-username",
+        "message": "1"
+    },
+    {
+        "username": "default-username",
+        "message": "2"
+    },
+    {
+        "username": "default-username",
+        "message": "Wassup braaa"
     }
-]('system', 'Welcome to lan chatroom'),
-('default-username', '1'),
+]

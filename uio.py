@@ -1,13 +1,12 @@
 # curses isn't included in windows python by default, to install it, run pip install windows-curses
 # the python docs on curses are really useful https://docs.python.org/3/howto/curses.html would suggest
 import curses
-from curses import wrapper
 import time
-from typing import Literal
+from typing import Literal, NoReturn
 import json
 
 
-def write_log(err_level: Literal["Error", "Warning", "Info"], msg) -> int:
+def write_log(err_level: Literal["FatalError", "Error", "Warning", "Info"], msg) -> int:
     """Writes something to uio.log in the format 'YYYY:MM:DD hh:mm:ss, {err_level}: "{msg}"\\n' and returns success.
     If global uio_log already exists, uses that, otherwise, opens uio.log as global uio_log, and uses that.
 
@@ -18,27 +17,22 @@ def write_log(err_level: Literal["Error", "Warning", "Info"], msg) -> int:
     Returns:
         int: Errors, 0 if writing succeeded with no errors, 1 if it failed
     """
+    log_msg = f"{time.strftime("%Y/%m/%d %H:%M:%S")}, {err_level}: '{msg}'\n"
     try:
-        uio_log.write(f'{time.strftime("%Y/%m/%d %H:%M:%S")}, {err_level}: "{msg}"\n')
+        uio_log.write(log_msg)
         return 0
     except:
         try:
-            uio_log = open("uio.log", "a")
-            uio_log.write(
-                f'{time.strftime("%Y/%m/%d %H:%M:%S")}, {err_level}: "{msg}"\n'
-            )
+            uio_log = open(uio_log_path, "a")
+            uio_log.write(log_msg)
             return 0
         except:
             return 1
 
 
-def exit_program(stdscr: curses.window) -> None:
-    """exits the program, first closing all files and resetting the terminal to a useable state"""
+def exit_program(stdscr: curses.window) -> NoReturn:
+    """exits the program, first explicitly closing any files that should be open and resetting the terminal to a useable state"""
 
-    try:  # close ChatHistory.json if open
-        chat_history_file.close()
-    except:
-        pass
     try:  # close uio.log if open
         uio_log.close()
     except:
@@ -68,12 +62,32 @@ def draw_screen(
     stdscr.addstr(height - 1 - input_offset, 0, f"> {in_buf}")
 
 
-def parse_input_buffer(msgs: list[tuple[str, str]], in_buf: str, username: str) -> None:
+def write_chat_history(
+    stdscr: curses.window, msgs: list[dict[str:str, str:str]]
+) -> None | NoReturn:
+    try:
+        with open(chat_history_file_path, "w") as chat_history_file:
+            chat_history_file.write(json.dumps(msgs, indent=4))
+    except Exception as e:
+        write_log(
+            "Error",
+            f'Exiting after failure to write a message to {chat_history_file_path}, "{e}"',
+        )
+        exit_program(stdscr)
 
-    msgs.append((username, in_buf))
-    
-    chat_history_file.write()
-    chat_history_file.close()
+
+def parse_input_buffer(
+    stdscr: curses.window,
+    msgs: list[dict[str:str, str:str]],
+    in_buf: str,
+    username: str,
+) -> None:
+    if in_buf == "/exit":
+        write_log("Info", "Exiting normally after /exit command")
+        exit_program(stdscr)
+    else:
+        msgs.append({"username": username, "message": in_buf})
+        write_chat_history(stdscr, msgs)
 
 
 def format_msg_json(username: str, msg: str) -> str:
@@ -89,30 +103,23 @@ def format_msg_json(username: str, msg: str) -> str:
     return json.dumps([{"username": username, "message": msg}], indent=4)
 
 
-def main(stdscr: curses.window) -> None:
+def main(stdscr: curses.window, msgs) -> None:
     user_username = "default-username"
     curses.noecho()
     curses.cbreak()
     stdscr.keypad(True)
 
-    # a list of tuples [(str-username, str-message),...]
-    # note when chat history sharing is implemented, msgs with username "system" shouldn't be shared
-    # and "system" should not be allowed as a username
-    messages: list[tuple[str, str]] = [
-        ("system", "Welcome to lan chatroom"),
-    ]
-
     in_buf = ""
 
     while True:
-        draw_screen(stdscr, messages, in_buf)
+        draw_screen(stdscr, msgs, in_buf)
 
         # getkey refreshes the screen, and pauses the program until an input before proceeding
         c = stdscr.getkey()
 
         if c == "\n":
             # user pressed enter, parse and flush input buffer
-            parse_input_buffer(messages, in_buf, user_username)
+            parse_input_buffer(stdscr, msgs, in_buf, user_username)
             in_buf = ""
         elif c == "\x08":
             # Backspace
@@ -125,25 +132,47 @@ def main(stdscr: curses.window) -> None:
             pass
 
 
+# These should be defined and or globalised even if this file is imported as a module
+global uio_log, uio_log_path, chat_history_file_path
+uio_log_path = "uio.log"
+chat_history_file_path = "LocalChatHistory.json"
+
 if __name__ == "__main__":
     stdscr = curses.initscr()
-    global uio_log
+    # uio_log is kept open, and only closed when program quits
     uio_log = open("uio.log", "a")
 
-    global chat_history_file
-    chat_history_file = open("LocalChatHistory.json", "+a")
-    chat_history_file.seek(0)
-    if chat_history_file.read() == "":
-        chat_history_file.write(format_msg_json("system", "Welcome to LAN Chatroom"))
+    # chat_history_file should be opened and then closed once a given operation is completed
+    with open(chat_history_file_path, "+a") as chat_history_file:
+        chat_history_file.seek(0)
+        if chat_history_file.read() == "":
+            chat_history_file.write(
+                format_msg_json("system", "Welcome to LAN Chatroom")
+            )
+
+    # a list of dicts [{"username": str-username, "message": str-message},...]
+    # note when chat history sharing is implemented, msgs with username "system" shouldn't be shared
+    # and "system" should not be allowed as a username
+    try:
+        with open(chat_history_file_path, "r") as chat_history_file:
+            chat_history_file.seek(0)
+            msgs = json.loads(chat_history_file.read())
+    except Exception as e:
+        write_log(
+            "Warning",
+            f'Failed to load chat history form {chat_history_file_path}, proceeding with empty history. "{e}"',
+        )
+        msgs = [{"username": "system", "message": "Failed to load chat history."}]
+        write_chat_history(stdscr, msgs)
 
     try:
-        main(stdscr)
+        main(stdscr, msgs)
     except KeyboardInterrupt:
         write_log("Info", "Exiting normally after KeyboardInterrupt")
         exit_program(stdscr)
     except Exception as e:
         write_log(
-            "Error",
-            f'Exiting with errors after an unexpected exception occurred. "{e}"',
+            "FatalError",
+            f'Exiting after an unexpected exception occurred. "{e}"',
         )
         exit_program(stdscr)
