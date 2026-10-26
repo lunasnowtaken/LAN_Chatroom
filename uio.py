@@ -4,6 +4,7 @@ import curses
 import time
 from typing import Literal, NoReturn
 import json
+import sys
 
 
 def write_log(err_level: Literal["FatalError", "Error", "Warning", "Info"], msg) -> int:
@@ -48,6 +49,7 @@ def exit_program(stdscr: curses.window) -> NoReturn:
         write_log("Warning", f'Soft error during initial exit sequence. "{e}"')
 
     curses.endwin()
+    sys.exit()
 
 
 def draw_screen(
@@ -85,6 +87,24 @@ def parse_input_buffer(
     if in_buf == "/exit":
         write_log("Info", "Exiting normally after /exit command")
         exit_program(stdscr)
+    if in_buf == "/clear":
+        try:
+            chat_history_file = open(chat_history_file_path, "r")
+            chat_history_file.seek(0)
+            contents = chat_history_file.read()
+            chat_history_file.close()
+            
+            # im unsure how the history file could be empty while msgs is not empty, but just in case
+            if contents == "" and msgs == []:
+                write_log("Info", f'No chat history to clear at "{chat_history_file_path}"')
+            else:
+                with open(chat_history_file_path, "w"):
+                    msgs = []
+                    write_log("Info", f'Cleared chat history at "{chat_history_file_path}"')
+                    # Opening in write mode clears the file first, so nothing else to do
+        except Exception as e:
+            write_log("Error", f'Failed to clear chat history at "{chat_history_file_path}" "{e}"')
+        
     else:
         msgs.append({"username": username, "message": in_buf})
         write_chat_history(stdscr, msgs)
@@ -168,7 +188,7 @@ if __name__ == "__main__":
     try:
         main(stdscr, msgs)
     except KeyboardInterrupt:
-        write_log("Info", "Exiting normally after KeyboardInterrupt")
+        write_log("Info", "Exiting normally after KeyboardInterrupt (usually occurs by pressing ctrl+c)")
         exit_program(stdscr)
     except Exception as e:
         write_log(
