@@ -1,5 +1,11 @@
+# Chat history is private
 LocalChatHistory.json
-uio.log
+# Theres no reason to put log files in the repo
 *.log
 tempCodeRunnerFile.py
 *.env
+# At the moment, all config files in this project are personalised and automatically generated, if this changes in the future, so must this rule
+# If this does change, I would suggest adding a rule like !included.conf, after *.conf
+*.conf
+# This was just a file ive been using to test functions as i program them
+testing.py
