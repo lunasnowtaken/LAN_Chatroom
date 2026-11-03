@@ -418,7 +418,7 @@ def main(
             # user pressed enter, parse and flush input buffer
             parse_input_buffer(stdscr, msgs, in_buf)
             in_buf = ""
-        elif c == "\x08":
+        elif c == "\x08" or c == "KEY_BACKSPACE":
             # Backspace
             in_buf = in_buf[:-1]
         elif len(c) == 1:
