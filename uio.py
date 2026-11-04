@@ -50,7 +50,7 @@ def exit_program(stdscr: curses.window) -> NoReturn:
         curses.nocbreak()
         stdscr.keypad(False)
     except Exception as e:
-        write_log("Warning", f'Soft error during initial exit sequence. {type(e)} {e}')
+        write_log("Warning", f"Soft error during initial exit sequence. {type(e)} {e}")
 
     curses.endwin()
     sys.exit()
@@ -207,6 +207,7 @@ def parse_input_buffer(
         in_buf = in_buf.replace(" ", "")
         if in_buf == "":
             # no new username given, echo current username
+            write_log("Info", "/username called, echoing current username.")
             add_message(
                 stdscr,
                 msgs,
@@ -214,6 +215,7 @@ def parse_input_buffer(
                 f"Your username is: {conf["username"]}\\n To change, use /username <new_username>",
             )
         elif in_buf == "system":
+            write_log("Info", "/username called with username system, no changes made.")
             add_message(
                 stdscr,
                 msgs,
@@ -221,6 +223,10 @@ def parse_input_buffer(
                 'Your username cannot be "system"',
             )
         else:
+            write_log(
+                "Info",
+                f"/username called with valid username {in_buf}, changing username.",
+            )
             conf["username"] = in_buf
             add_message(stdscr, msgs, "system", f"Changed username to {in_buf}")
             try:
@@ -228,7 +234,8 @@ def parse_input_buffer(
                     f.write(json.dumps(conf, indent=4))
             except Exception as e:
                 write_log(
-                    "Error", f"Failed to save username change to {conf_file_path}. {type(e)} {e}"
+                    "Error",
+                    f"Failed to save username change to {conf_file_path}. {type(e)} {e}",
                 )
                 add_message(
                     stdscr,
@@ -304,7 +311,7 @@ def load_conf(conf_path: str | None = None) -> int:
                 )
                 conf = {
                     "username": "anonymous",
-                    "chat_history_path": "LocalChatHistory.json"
+                    "chat_history_path": "LocalChatHistory.json",
                 }
                 config_success = 1
         else:
@@ -321,6 +328,7 @@ def load_conf(conf_path: str | None = None) -> int:
                         conf = json.loads(contents)
                         conf_file_path = config
                         config_success = 0
+                        write_log("Info", f"Successfully loaded config {config}")
                         break
                 except Exception as e:
                     # couldn't use that conf,
@@ -337,7 +345,7 @@ def load_conf(conf_path: str | None = None) -> int:
                     with open("user.conf", "w") as f:
                         conf = {
                             "username": "anonymous",
-                            "chat_history_path": "LocalChatHistory.json"
+                            "chat_history_path": "LocalChatHistory.json",
                         }
                         f.write(json.dumps(conf, indent=4))
                         conf_file_path = "user.conf"
@@ -351,7 +359,7 @@ def load_conf(conf_path: str | None = None) -> int:
                     )
                     conf = {
                         "username": "anonymous",
-                        "chat_history_path": "LocalChatHistory.json"
+                        "chat_history_path": "LocalChatHistory.json",
                     }
                     config_success = 1
     else:
@@ -385,7 +393,7 @@ def main(
     init_error_codes: str[int] = [],
 ) -> None:
     height, width = curses.LINES, curses.COLS
-    write_log("Info", f"Program launched with height, width: {height}, {width}")
+    write_log("Info", f"Entered main with height, width: {height}, {width}")
 
     if 1 in init_error_codes:
         add_message(
@@ -435,6 +443,7 @@ if __name__ == "__main__":
     global uio_log, uio_log_path
     uio_log_path = "uio.log"
     uio_log = open(uio_log_path, "a")
+    write_log("Info", "----- Program Launched -----")
 
     error_codes = []
     conf_success = load_conf()
@@ -481,6 +490,6 @@ if __name__ == "__main__":
     except Exception as e:
         write_log(
             "FatalError",
-            f'Exiting after an unexpected exception occurred. {type(e)} {e}',
+            f"Exiting after an unexpected exception occurred. {type(e)} {e}",
         )
         exit_program(stdscr)
