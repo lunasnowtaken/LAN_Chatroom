@@ -1,5 +1,8 @@
 # curses isn't included in windows python by default, to install it, run pip install windows-curses
 # the python docs on curses are really useful https://docs.python.org/3/howto/curses.html would suggest
+
+# TODO Refactor this code into a class system, as opposed to a set of functions.
+
 import curses
 import time
 from typing import Literal, NoReturn
