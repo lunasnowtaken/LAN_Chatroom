@@ -14,6 +14,7 @@ def write_log(
 ) -> int:
     """Writes something to uio.log in the format 'YYYY:MM:DD hh:mm:ss, {err_level}: "{msg}"\\n' and returns success.
     If global uio_log already exists, uses that, otherwise, opens uio.log and uses that.
+    msg text can contain apostrophes (') but should not contain quotation marks (")
 
     Args:
         err_level (Literal["FatalError", "Error", "Warning", "Info"]): The log severity, should be 1 of the 4 offered options, can be an any str.
@@ -22,7 +23,7 @@ def write_log(
     Returns:
         int: Errors, 0 if writing succeeded with no errors, 1 if it failed
     """
-    log_msg = f"{time.strftime("%Y/%m/%d %H:%M:%S")}, {err_level}: '{msg}'\n"
+    log_msg = f'{time.strftime("%Y/%m/%d %H:%M:%S")}, {err_level}: "{msg}"\n'
     try:
         uio_log.write(log_msg)
         return 0
@@ -281,10 +282,15 @@ def load_conf(conf_path: str | None = None) -> int:
         conf_path (str | None, optional): The path to a .conf file to load. When None or not given, automatically finds or creates a .conf
 
     Returns:
-        int: for conf_path = None: 0 if no errors, 1 if failed to load or create a conf, 2 if failed to load but successfully created a conf.
-             for conf_path = str: 0 if no errors, 1 if failed to load conf
+        int: for conf_path = None: 0 if created a conf, 1 if failed to load or create a conf, 2 if loaded a conf.
+             for conf_path = str: 0 if no errors, 1 if failed to load conf.
     """
-    # TODO: Finish this
+    # Forgive me for my sins, the control flow of this 100+ line function is a nightmare of nested if statements.
+    # TODO Refactor load_conf
+    # Im sure we'll get to doing this eventually, 
+    # but for now, have fun trying to hold in your head all the conditions of last 3 if statements.
+    # God I hope there aren't any errors here, for your sake and mine.
+    
     global conf, conf_file_path
     conf_file_path = None
     config_success = -1
@@ -326,42 +332,30 @@ def load_conf(conf_path: str | None = None) -> int:
                         f.seek(0)
                         contents = f.read()
                         conf = json.loads(contents)
+                        if conf["username"] == "system":
+                            raise RuntimeError(
+                                f'username in conf {config} is system, username cannot be system'
+                            )
                         conf_file_path = config
-                        config_success = 0
+                        config_success = 2
                         write_log("Info", f"Successfully loaded config {config}")
                         break
                 except Exception as e:
                     # couldn't use that conf,
                     write_log(
-                        "Error",
+                        "Warning",
                         f"Failed to load config file at {config} {type(e)} {e}",
                     )
-            if config_success != 0:
+            if config_success != 2:
                 write_log(
-                    "Info",
-                    "Unable to load any of the found config files, attempting to make one.",
+                    "Error",
+                    "Unable to load any of the found config files. Proceeding without a conf file.",
                 )
-                try:
-                    with open("user.conf", "w") as f:
-                        conf = {
-                            "username": "anonymous",
-                            "chat_history_path": "LocalChatHistory.json",
-                        }
-                        f.write(json.dumps(conf, indent=4))
-                        conf_file_path = "user.conf"
-                        write_log("Info", f"Successfully created config file user.conf")
-                        config_success = 2
-                except Exception as e:
-                    # couldn't make one, proceed without
-                    write_log(
-                        "Error",
-                        f"Failed to create config file user.conf, proceeding without a conf file. {type(e)} {e}",
-                    )
-                    conf = {
-                        "username": "anonymous",
-                        "chat_history_path": "LocalChatHistory.json",
-                    }
-                    config_success = 1
+                conf = {
+                    "username": "anonymous",
+                    "chat_history_path": "LocalChatHistory.json",
+                }
+                config_success = 1
     else:
         write_log(
             "Info",
@@ -401,13 +395,6 @@ def main(
             msgs,
             "system",
             "Failed to load or create a .conf file. Check uio.log for details.",
-        )
-    elif 2 in init_error_codes:
-        add_message(
-            stdscr,
-            msgs,
-            "system",
-            "Failed to load .conf file, created a new file. Check uio.log for details.",
         )
 
     curses.noecho()
