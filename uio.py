@@ -379,8 +379,6 @@ def load_conf(conf_path: str | None = None) -> int:
             )
             config_success = 1
 
-    conf["chat_history_path"] = conf["chat_history_path"]
-
     return config_success
 
 
